@@ -119,10 +119,105 @@ async def get_status_checks():
     return [StatusCheck(**status_check) for status_check in status_checks]
 
 # Authentication Routes
-@api_router.post("/register", response_model=AuthResponse)
-async def register_user_direct(user_data: UserCreate):
-    """Register a new user - direct endpoint that frontend expects"""
-    return await register_user(user_data)
+@api_router.post("/register")
+async def register_user_direct(request_data: dict):
+    """Register a new user - flexible endpoint that handles any data format"""
+    try:
+        logging.info(f"Registration attempt with data: {request_data}")
+        
+        # Extract required fields
+        username = request_data.get("username")
+        email = request_data.get("email")
+        password = request_data.get("password")
+        confirm_password = request_data.get("confirmPassword")
+        
+        if not all([username, email, password, confirm_password]):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing required fields: username, email, password, confirmPassword"
+            )
+        
+        # Validate password confirmation
+        if password != confirm_password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Passwords do not match"
+            )
+        
+        # Check if user already exists
+        existing_user = await db.users.find_one({
+            "$or": [
+                {"email": email},
+                {"username": username}
+            ]
+        })
+        
+        if existing_user:
+            if existing_user.get("email") == email:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Email already registered"
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Username already taken"
+                )
+        
+        # Create user profile with optional fields
+        profile = {
+            "age": request_data.get("age"),
+            "gender": request_data.get("gender"),
+            "height": request_data.get("height"),
+            "weight": request_data.get("weight"),
+            "activity_level": request_data.get("activity_level", "sedentary"),
+            "goal": request_data.get("goal", "maintain")
+        }
+        
+        # Create user object
+        user_id = str(uuid.uuid4())
+        current_time = datetime.utcnow()
+        
+        user_doc = {
+            "id": user_id,
+            "username": username,
+            "email": email,
+            "password_hash": hash_password(password),
+            "profile": profile,
+            "created_at": current_time,
+            "updated_at": current_time
+        }
+        
+        # Insert user into database
+        result = await db.users.insert_one(user_doc)
+        
+        if result.inserted_id:
+            # Return success response
+            return {
+                "success": True,
+                "message": "User registered successfully",
+                "user": {
+                    "id": user_id,
+                    "username": username,
+                    "email": email,
+                    "profile": profile,
+                    "created_at": current_time.isoformat()
+                }
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create user"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Registration error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error during registration"
+        )
 
 @api_router.post("/auth/register", response_model=AuthResponse)
 async def register_user(user_data: UserCreate):
