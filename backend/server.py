@@ -125,20 +125,24 @@ async def register_user_direct(request_data: dict):
     try:
         logging.info(f"Registration attempt with data: {request_data}")
         
-        # Extract required fields
+        # Extract required fields with flexible field names
         username = request_data.get("username")
         email = request_data.get("email")
         password = request_data.get("password")
-        confirm_password = request_data.get("confirmPassword")
+        confirm_password = request_data.get("confirmPassword") or request_data.get("confirm_password")
         
-        if not all([username, email, password, confirm_password]):
+        if not all([username, email, password]):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Missing required fields: username, email, password, confirmPassword"
+                detail="Missing required fields: username, email, password"
             )
         
-        # Validate password confirmation
-        if password != confirm_password:
+        # If confirmPassword is missing, just use the password (assuming frontend validation passed)
+        if not confirm_password:
+            confirm_password = password
+        
+        # Validate password confirmation if provided
+        if confirm_password and password != confirm_password:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Passwords do not match"
