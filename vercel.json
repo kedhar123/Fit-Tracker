@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://f3cd90b3-2292-4467-995f-564576efd452.preview.emergentagent.com/api/$1"
+    }
+  ]
+}
