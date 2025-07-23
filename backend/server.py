@@ -119,6 +119,11 @@ async def get_status_checks():
     return [StatusCheck(**status_check) for status_check in status_checks]
 
 # Authentication Routes
+@api_router.post("/register", response_model=AuthResponse)
+async def register_user_direct(user_data: UserCreate):
+    """Register a new user - direct endpoint that frontend expects"""
+    return await register_user(user_data)
+
 @api_router.post("/auth/register", response_model=AuthResponse)
 async def register_user(user_data: UserCreate):
     """Register a new user"""
